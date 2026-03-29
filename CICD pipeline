@@ -1,0 +1,49 @@
+pipeline {
+ agent any
+ environment {
+ DOCKER_USERNAME = "your_dockerhub_username"
+ IMAGE_NAME = "college-system"
+ IMAGE_TAG = "latest"
+ }
+ stages {
+ stage('Checkout Code') {
+ steps {
+ git branch: 'main',
+ url: 'https://github.com/DivyanshSingh8899/CollegeManagement-System-Python.git'
+ }
+ }
+ stage('Verify Docker') {
+ steps {
+ bat 'docker --version'
+ }
+ }
+ stage('Build Docker Image') {
+ steps {
+ bat 'docker build -t
+%DOCKER_USERNAME%/%IMAGE_NAME%:%IMAGE_TAG% .'
+ }
+ }
+ stage('Login to DockerHub') {
+ steps {
+ script {
+ withCredentials([usernamePassword(
+ credentialsId: 'dockerhub-cred',
+usernameVariable: 'DOCKER_USER',
+passwordVariable: 'DOCKER_PASS'
+ )]) {
+ bat '''
+echo %DOCKER_PASS% | docker login -u %DOCKER_USER%
+--password-stdin
+ '''
+ }
+ }
+ }
+ }
+ stage('Push Image') {
+ steps {
+ bat 'docker push
+%DOCKER_USERNAME%/%IMAGE_NAME%:%IMAGE_TAG%'
+ }
+ }
+ }
+}
