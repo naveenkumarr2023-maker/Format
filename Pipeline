@@ -1,39 +1,78 @@
 pipeline {
- agent any
- environment {
- DOCKER_IMAGE = "<<dockerhubusername>>/html-demo"
- }
- stages {
- stage('Clone Code') {
- steps {
- git branch: 'main',
- url: '<<UserGITHUB repository>>’
- }
- }
- stage('Build Docker Image') {
- steps {
- bat 'docker build -t %DOCKER_IMAGE% .'
- }
- }
- stage('Push Image') {
- steps {
- withCredentials([usernamePassword(credentialsId: 'dockerhub', 
-usernameVariable: 'USER', passwordVariable: 'PASS')]) {
- bat 'docker login -u %USER% -p %PASS%'
- bat 'docker push %DOCKER_IMAGE%'
- }
- }
- }
- stage('Deploy to Kubernetes') {
- steps {
- withCredentials([file(credentialsId: 'kuberconfig', variable: 
-'KUBECONFIG')]) {
- bat '''
- set KUBECONFIG=%KUBECONFIG%
- kubectl apply -f deployment.yaml --validate=false
- '''
- }
- }
- }
- }
+    agent any
+
+    tools {
+        maven 'Maven3'
+        jdk 'JDK17'
+    }
+
+    environment {
+        DOCKER_IMAGE = "23mis0607/java-test-app:latest"
+    }
+
+    stages {
+        stage('Clone Code') {
+            steps {
+                git branch: 'main',
+                    url: 'https://github.com/naveenkumarr2023-maker/Java-CICD.git'
+            }
+        }
+
+        stage('Build with Maven') {
+            steps {
+                bat 'mvn clean package'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                bat '''
+                docker logout
+                docker build -t %DOCKER_IMAGE% .
+                '''
+            }
+        }
+
+        stage('Check Docker Credential') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-creds',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    bat 'echo Jenkins Docker user is %DOCKER_USER%'
+                }
+            }
+        }
+
+        stage('Push Image') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-creds',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    bat '''
+                    echo %DOCKER_PASS%| docker login -u %DOCKER_USER% --password-stdin
+                    docker push %DOCKER_IMAGE%
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+               bat 'kubectl --kubeconfig=C:\\Users\\rnave\\.kube\\config apply -f deployment.yaml --validate=false'
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'All stages passed successfully!'
+        }
+        failure {
+            echo 'Pipeline failed. Check the failed stage logs.'
+        }
+    }
 }
